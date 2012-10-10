@@ -6,3 +6,7 @@ cookie
 build/
 .sass-cache/
 *$py.class
+out
+*.ipr
+*.iws
+*.iml

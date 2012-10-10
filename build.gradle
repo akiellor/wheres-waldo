@@ -1,89 +1,111 @@
-apply plugin: 'java'
 apply plugin: 'idea'
+apply plugin: 'war'
 
-// build stuff
 sourceCompatibility = 1.6
 targetCompatibility = 1.6
 
 configurations {
-  cucumberRuntime {
-    extendsFrom testRuntime
-  }
+    bootstrap
+
+    cucumberRuntime.extendsFrom testRuntime
 }
 
 repositories {
-  maven {
-    url "http://gemjars.org/maven"
-  }
-  mavenCentral()
+    maven {
+        url "http://gemjars.org/maven"
+    }
+    maven {
+        url "https://oss.sonatype.org/content/repositories/snapshots/"
+    }
+    mavenCentral()
 }
 
 dependencies {
-  compile "org.jruby:jruby-complete:1.6.7.2"
-  compile "org.rubygems:gearup:0.0.5"
-  compile 'org.rubygems:sprockets:2.4.5'
-  compile 'org.rubygems:tilt:1.3.3'
-  compile 'org.rubygems:coffee-script:2.2.0'
-  compile 'org.rubygems:execjs:1.4.0'
-  compile 'org.rubygems:therubyrhino:2.0.0'
-  compile 'org.rubygems:less:2.2.1'
+    bootstrap 'org.eclipse.jetty:jetty-server:8.1.4.v20120524'
+    bootstrap 'org.eclipse.jetty:jetty-servlet:8.1.4.v20120524'
+    bootstrap 'org.eclipse.jetty:jetty-io:8.1.4.v20120524'
+    bootstrap 'org.eclipse.jetty:jetty-util:8.1.4.v20120524'
+    bootstrap 'org.eclipse.jetty:jetty-webapp:8.1.4.v20120524'
 
-  compile 'org.python:jython-standalone:2.5.3'
+    compile "org.jruby:jruby-complete:1.6.7.2"
+    compile "org.rubygems:gearup:0.0.5"
+    compile 'org.rubygems:sprockets:2.4.5'
+    compile 'org.rubygems:tilt:1.3.3'
+    compile 'org.rubygems:coffee-script:2.2.0'
+    compile 'org.rubygems:execjs:1.4.0'
+    compile 'org.rubygems:therubyrhino:2.0.0'
+    compile 'org.rubygems:less:2.2.1'
 
-  compile 'org.ioke:ioke-lang:P-0.4.0-p11'
-  compile 'org.ioke:ioke-lang-lib:P-0.4.0-p11'
+    compile 'org.python:jython-standalone:2.5.3'
 
-  testCompile 'junit:junit:4.10',
-      'info.cukes:cucumber-core:1.0.14',
-      'info.cukes:cucumber-java:1.0.14',
-      'info.cukes:cucumber-junit:1.0.14'
+    compile 'org.ioke:ioke-lang:P-0.4.0-p11'
+    compile 'org.ioke:ioke-lang-lib:P-0.4.0-p11'
+
+    compile 'st.redline:redline:0.2-SNAPSHOT'
+
+    testCompile 'junit:junit:4.10',
+                'info.cukes:cucumber-core:1.0.14',
+                'info.cukes:cucumber-java:1.0.14',
+                'info.cukes:cucumber-junit:1.0.14'
 }
 
 sourceSets {
-  main {
-    resources {
-      srcDirs 'src/main/ioke', 'src/main/python', 'src/main/resources'
+    main {
+        resources {
+            srcDirs 'src/main/ioke', 'src/main/python', 'src/main/resources'
+        }
     }
-  }
 }
 
 task cucumberRuntime(dependsOn: assemble) << {
-  javaexec {
-    main = "cucumber.cli.Main"
-    classpath = configurations.cucumberRuntime
-    args = ["-f", "pretty", "--glue", "src/test/java", "src/test/resources"]
-  }
+    javaexec {
+        main = "cucumber.cli.Main"
+        classpath = configurations.cucumberRuntime
+        args = ["-f", "pretty", "--glue", "src/test/java", "src/test/resources"]
+    }
 }
 
 task(assets, type: JavaExec) {
-  classpath runtimeClasspath
-  main = "org.jruby.Main"
-  args = ["classpath:bin/gearup", "src/main/resources"]
+    classpath runtimeClasspath
+    main = "org.jruby.Main"
+    args = ["classpath:bin/gearup", "src/main/resources"]
 }
 
 task(service, type: JavaExec) {
-  classpath runtimeClasspath
-  environment([
-      'JYTHONPATH': sourceSets.main.resources.srcDirs.collect { it.toString() }.join(":")
-  ])
-  main = "org.python.util.jython"
-  args = ["src/main/python/jigscraper/webservice.py", System.getProperty("username"), System.getProperty("rsa.token")]
+    classpath runtimeClasspath
+    environment([
+            'JYTHONPATH': sourceSets.main.resources.srcDirs.collect { it.toString() }.join(":")
+    ])
+    main = "org.python.util.jython"
+    args = ["src/main/python/jigscraper/webservice.py", System.getProperty("username"), System.getProperty("rsa.token")]
 }
 
 task(jythonHelp, type: JavaExec) {
-  classpath runtimeClasspath
-  main = "org.python.util.jython"
-  args = ["--help"]
+    classpath runtimeClasspath
+    main = "org.python.util.jython"
+    args = ["--help"]
 }
 
 task(iokeRun, type: JavaExec) {
-  classpath runtimeClasspath
-  main = "ioke.lang.Main"
-  args = ["--", "src/main/ioke/helloworld.ik"]
+    classpath runtimeClasspath
+    main = "ioke.lang.Main"
+    args = ["--", "src/main/ioke/helloworld.ik"]
 }
 
 task(iokeHelp, type: JavaExec) {
-  classpath runtimeClasspath
-  main = "ioke.lang.Main"
-  args = ["--help"]
+    classpath runtimeClasspath
+    main = "ioke.lang.Main"
+    args = ["--help"]
+}
+
+war {
+    from configurations.bootstrap.collect { it.isDirectory() ? it : zipTree(it) } + files(sourceSets.main.output)
+    classpath = runtimeClasspath - configurations.bootstrap
+    manifest {
+        attributes 'Main-Class': 'com.thoughtworks.rosetta.Server'
+    }
+}
+
+idea.module {
+    scopes.COMPILE.plus += configurations.bootstrap
 }
